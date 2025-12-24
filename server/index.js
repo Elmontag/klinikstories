@@ -95,7 +95,7 @@ app.get("/api/imap/ping", async (_req, res) => {
   res.json(result);
 });
 
-app.get("/api/imap/messages", async (_req, res) => {
+app.get("/api/imap/messages", async (req, res) => {
   if (!isImapConfigured()) {
     res.status(400).json({
       error: "IMAP-Konfiguration unvollständig."
@@ -103,10 +103,15 @@ app.get("/api/imap/messages", async (_req, res) => {
     return;
   }
 
+  const mailbox =
+    typeof req.query.mailbox === "string" && req.query.mailbox.trim().length > 0
+      ? req.query.mailbox.trim()
+      : config.imap.mailbox;
+
   const client = new ImapFlow(config.imap);
   try {
     await client.connect();
-    await client.mailboxOpen(config.imap.mailbox);
+    await client.mailboxOpen(mailbox);
 
     const messageUids = await client.search({ all: true });
     const latestUids = messageUids.slice(-20).reverse();
@@ -134,7 +139,7 @@ app.get("/api/imap/messages", async (_req, res) => {
       });
     }
 
-    res.json({ mailbox: config.imap.mailbox, messages });
+    res.json({ mailbox, messages });
   } catch (error) {
     res.status(500).json({
       error: "IMAP-Abruf fehlgeschlagen.",

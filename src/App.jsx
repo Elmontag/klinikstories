@@ -33,6 +33,7 @@ function buildThread(text) {
 }
 
 const apiBase = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
+const mailboxOptions = ["INBOX", "Sent", "Archive", "Trash"];
 
 export default function App() {
   const [activeNav, setActiveNav] = useState("dashboard");
@@ -97,7 +98,8 @@ export default function App() {
   const syncInbox = async () => {
     setSyncError("");
     try {
-      const response = await fetch(`${apiBase}/api/imap/messages`);
+      const mailboxParam = encodeURIComponent(mailboxName);
+      const response = await fetch(`${apiBase}/api/imap/messages?mailbox=${mailboxParam}`);
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error ?? "IMAP-Sync fehlgeschlagen");
@@ -384,7 +386,16 @@ export default function App() {
                 </div>
                 <div>
                   <p className="role-title">Postfach</p>
-                  <p className="muted">{mailboxName}</p>
+                  <select
+                    value={mailboxName}
+                    onChange={(event) => setMailboxName(event.target.value)}
+                  >
+                    {mailboxOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <p className="role-title">Server-Erreichbarkeit</p>
