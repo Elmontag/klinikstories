@@ -4,14 +4,24 @@ services:
     ports:
       - "4173:4173"
     environment:
-      - VITE_IMAP_SERVER=${VITE_IMAP_SERVER}
-      - VITE_IMAP_PORT=${VITE_IMAP_PORT}
-      - VITE_IMAP_MAILBOX=${VITE_IMAP_MAILBOX}
-      - VITE_IMAP_TLS=${VITE_IMAP_TLS}
-      - VITE_IMAP_USERNAME=${VITE_IMAP_USERNAME}
-      - VITE_BLUESKY_HANDLE=${VITE_BLUESKY_HANDLE}
-      - VITE_BLUESKY_APP_PASSWORD=${VITE_BLUESKY_APP_PASSWORD}
-      - VITE_BLUESKY_HOST=${VITE_BLUESKY_HOST}
+      - VITE_API_BASE=${VITE_API_BASE}
+    depends_on:
+      - api
+
+  api:
+    build: ./server
+    ports:
+      - "8080:8080"
+    environment:
+      - IMAP_HOST=${IMAP_HOST}
+      - IMAP_PORT=${IMAP_PORT}
+      - IMAP_MAILBOX=${IMAP_MAILBOX}
+      - IMAP_TLS=${IMAP_TLS}
+      - IMAP_USER=${IMAP_USER}
+      - IMAP_PASS=${IMAP_PASS}
+      - BLUESKY_HANDLE=${BLUESKY_HANDLE}
+      - BLUESKY_APP_PASSWORD=${BLUESKY_APP_PASSWORD}
+      - BLUESKY_HOST=${BLUESKY_HOST}
     volumes:
       - dashboard-data:/app/data
 

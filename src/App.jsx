@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
+import { useEffect } from "react";
 
-const initialInbox = [
+const demoInbox = [
   {
     id: "mail-1001",
     subject: "Danke an unser Team",
@@ -10,26 +11,6 @@ const initialInbox = [
     body:
       "Liebes Team, vielen Dank für euren Einsatz in dieser Woche. Die Rückmeldungen unserer Patientinnen und Patienten waren durchweg positiv. Wir möchten einige Zeilen als Klinikstory veröffentlichen.",
     attachments: ["danke-team.jpg", "schichtplan.png"]
-  },
-  {
-    id: "mail-1002",
-    subject: "Nachtschicht-Story",
-    receivedAt: "Gestern, 19:05",
-    status: "Geprüft",
-    from: "leitung@beispiel.de",
-    body:
-      "Die Nachtschicht hat eine besondere Dynamik: Ruhe, Fokus und dennoch höchste Aufmerksamkeit. Diese Geschichte zeigt, wie wichtig unsere Kolleginnen und Kollegen im Hintergrund sind.",
-    attachments: ["nacht.jpg"]
-  },
-  {
-    id: "mail-1003",
-    subject: "Spendenaktion im Klinikgarten",
-    receivedAt: "Gestern, 14:22",
-    status: "Veröffentlicht",
-    from: "stiftung@beispiel.de",
-    body:
-      "Unsere Spendenaktion im Klinikgarten war ein voller Erfolg. Die Stimmung war freundlich, und viele Familien haben sich beteiligt. Wir möchten die Highlights als Thread veröffentlichen.",
-    attachments: []
   }
 ];
 
@@ -38,20 +19,6 @@ const navItems = [
   { id: "workflow", label: "Inbox & Publikation" },
   { id: "settings", label: "Einstellungen" }
 ];
-
-const defaultImap = {
-  server: import.meta.env.VITE_IMAP_SERVER ?? "imap.klinik.de",
-  port: import.meta.env.VITE_IMAP_PORT ?? "993",
-  mailbox: import.meta.env.VITE_IMAP_MAILBOX ?? "inbox@klinik.de",
-  tls: import.meta.env.VITE_IMAP_TLS ? import.meta.env.VITE_IMAP_TLS === "true" : true,
-  username: import.meta.env.VITE_IMAP_USERNAME ?? "imap-reader"
-};
-
-const defaultBlueSky = {
-  handle: import.meta.env.VITE_BLUESKY_HANDLE ?? "@klinikstories.bsky.social",
-  appPassword: import.meta.env.VITE_BLUESKY_APP_PASSWORD ?? "••••••••",
-  host: import.meta.env.VITE_BLUESKY_HOST ?? "https://bsky.social"
-};
 
 const MAX_POST = 300;
 
@@ -65,21 +32,31 @@ function buildThread(text) {
   return chunks;
 }
 
+const apiBase = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
+
 export default function App() {
   const [activeNav, setActiveNav] = useState("dashboard");
-  const [selectedMailId, setSelectedMailId] = useState(initialInbox[0].id);
+  const [selectedMailId, setSelectedMailId] = useState(demoInbox[0].id);
   const [showPreview, setShowPreview] = useState(false);
-  const [imapConfig, setImapConfig] = useState(defaultImap);
-  const [blueSkyConfig, setBlueSkyConfig] = useState(defaultBlueSky);
   const [attachmentSelection, setAttachmentSelection] = useState({});
-  const selectedMail = initialInbox.find((mail) => mail.id === selectedMailId);
+  const [inbox, setInbox] = useState(demoInbox);
+  const [mailboxName, setMailboxName] = useState("INBOX");
+  const [lastSync, setLastSync] = useState("Noch kein Sync");
+  const [syncError, setSyncError] = useState("");
+  const [health, setHealth] = useState({
+    imapConfigured: false,
+    blueSkyConfigured: false,
+    adminConfigured: false
+  });
+  const [blueSkyCheck, setBlueSkyCheck] = useState("Ungeprüft");
+  const [publishStatus, setPublishStatus] = useState("");
 
-  const threadParts = useMemo(() => buildThread(selectedMail.body), [selectedMail]);
+  const selectedMail = inbox.find((mail) => mail.id === selectedMailId) ?? inbox[0];
+  const threadParts = useMemo(
+    () => (selectedMail ? buildThread(selectedMail.body) : []),
+    [selectedMail]
+  );
   const selectedAttachments = attachmentSelection[selectedMailId] || {};
-
-  const imapComplete = Object.values(imapConfig).every((value) => value);
-  const blueSkyComplete = Object.values(blueSkyConfig).every((value) => value);
-  const consistencyState = imapComplete && blueSkyComplete;
 
   const toggleAttachment = (file) => {
     setAttachmentSelection((prev) => ({
@@ -95,11 +72,96 @@ export default function App() {
     setSelectedMailId(mailId);
   };
 
+  const loadHealth = async () => {
+    try {
+      const response = await fetch(`${apiBase}/api/health`);
+      if (!response.ok) {
+        throw new Error("Health-Check fehlgeschlagen");
+      }
+      const data = await response.json();
+      setHealth({
+        imapConfigured: Boolean(data.imapConfigured),
+        blueSkyConfigured: Boolean(data.blueSkyConfigured),
+        adminConfigured: Boolean(data.adminConfigured)
+      });
+    } catch (error) {
+      setHealth({
+        imapConfigured: false,
+        blueSkyConfigured: false,
+        adminConfigured: false
+      });
+    }
+  };
+
+  const syncInbox = async () => {
+    setSyncError("");
+    try {
+      const response = await fetch(`${apiBase}/api/imap/messages`);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error ?? "IMAP-Sync fehlgeschlagen");
+      }
+      const data = await response.json();
+      setInbox(data.messages.length > 0 ? data.messages : demoInbox);
+      setMailboxName(data.mailbox ?? "INBOX");
+      setLastSync(new Date().toLocaleString("de-DE"));
+    } catch (error) {
+      setSyncError(error.message);
+      setInbox(demoInbox);
+    }
+  };
+
+  const checkBlueSky = async () => {
+    setBlueSkyCheck("Prüfe...");
+    try {
+      const response = await fetch(`${apiBase}/api/bluesky/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error ?? "BlueSky-Check fehlgeschlagen");
+      }
+      setBlueSkyCheck("Verbindung OK");
+    } catch (error) {
+      setBlueSkyCheck(`Fehler: ${error.message}`);
+    }
+  };
+
+  const publishThread = async () => {
+    if (!selectedMail) {
+      return;
+    }
+    setPublishStatus("Publikation läuft...");
+    try {
+      const response = await fetch(`${apiBase}/api/bluesky/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread: threadParts
+        })
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error ?? "Publikation fehlgeschlagen");
+      }
+      setPublishStatus("Veröffentlichung gestartet");
+    } catch (error) {
+      setPublishStatus(`Fehler: ${error.message}`);
+    }
+  };
+
+  useEffect(() => {
+    loadHealth();
+  }, []);
+
   const navDescription = {
     dashboard: "Status, Integrationen und Inbox-Überblick.",
     workflow: "Eingänge prüfen, Thread aufteilen und veröffentlichen.",
     settings: "IMAP, BlueSky und Rollen verwalten."
   };
+
+  const consistencyState = health.imapConfigured && health.blueSkyConfigured;
 
   return (
     <div className="app-shell">
@@ -149,12 +211,13 @@ export default function App() {
                   <h2>Inbox-Übersicht</h2>
                   <p>Neue Mails im Blick, ohne Inhalt zu öffnen.</p>
                 </div>
-                <button className="primary" type="button">
+                <button className="primary" type="button" onClick={syncInbox}>
                   IMAP-Sync starten
                 </button>
               </div>
+              {syncError ? <p className="error">{syncError}</p> : null}
               <div className="inbox-list">
-                {initialInbox.map((mail) => (
+                {inbox.map((mail) => (
                   <button
                     key={mail.id}
                     className={`mail-item ${mail.id === selectedMailId ? "active" : ""}`}
@@ -175,22 +238,22 @@ export default function App() {
               <h2>Publikations-Check</h2>
               <p className="muted">Konsistenz zwischen IMAP, BlueSky und Dashboard.</p>
               <div className="checklist">
-                <div className={imapComplete ? "check ok" : "check warn"}>
+                <div className={health.imapConfigured ? "check ok" : "check warn"}>
                   <span className="check-title">IMAP-Konfiguration</span>
-                  <span>{imapComplete ? "Verbunden" : "Fehlende Angaben"}</span>
+                  <span>{health.imapConfigured ? "Verbunden" : "Fehlende Angaben"}</span>
                 </div>
-                <div className={blueSkyComplete ? "check ok" : "check warn"}>
+                <div className={health.blueSkyConfigured ? "check ok" : "check warn"}>
                   <span className="check-title">BlueSky API</span>
-                  <span>{blueSkyComplete ? "Bereit" : "Zugang fehlt"}</span>
+                  <span>{health.blueSkyConfigured ? "Bereit" : "Zugang fehlt"}</span>
                 </div>
-                <div className="check ok">
-                  <span className="check-title">Dashboard-Status</span>
-                  <span>Responsive & aktuell</span>
+                <div className={health.adminConfigured ? "check ok" : "check warn"}>
+                  <span className="check-title">Admin-Login</span>
+                  <span>{health.adminConfigured ? "Hinterlegt" : "Fehlt"}</span>
                 </div>
               </div>
               <div className="callout">
                 <h3>Letzter erfolgreicher Sync</h3>
-                <p>Heute, 08:45 • 3 neue Mails importiert</p>
+                <p>{lastSync} • Postfach: {mailboxName}</p>
               </div>
             </article>
 
@@ -207,8 +270,7 @@ export default function App() {
                   <p className="muted">Thread-Länge prüfen und Veröffentlichung starten.</p>
                 </div>
               </div>
-              <button className="secondary" type="button" onClick={() => setActiveNav("workflow")}
-              >
+              <button className="secondary" type="button" onClick={() => setActiveNav("workflow")}>
                 Zum Workflow
               </button>
             </article>
@@ -223,13 +285,24 @@ export default function App() {
                   <h2>Inbox & Publikation</h2>
                   <p>Inhalte prüfen, Anhänge auswählen und Thread vorbereiten.</p>
                 </div>
-                <button className="secondary" type="button" onClick={() => setShowPreview(true)}>
-                  Vorschau öffnen
-                </button>
+                <div className="button-row">
+                  <button className="secondary" type="button" onClick={syncInbox}>
+                    IMAP-Sync
+                  </button>
+                  <button
+                    className="primary"
+                    type="button"
+                    disabled={!selectedMail}
+                    onClick={() => setShowPreview(true)}
+                  >
+                    Publizieren
+                  </button>
+                </div>
               </div>
+              {syncError ? <p className="error">{syncError}</p> : null}
               <div className="inbox">
                 <div className="inbox-list">
-                  {initialInbox.map((mail) => (
+                  {inbox.map((mail) => (
                     <button
                       key={mail.id}
                       className={`mail-item ${mail.id === selectedMailId ? "active" : ""}`}
@@ -247,20 +320,18 @@ export default function App() {
                 <div className="inbox-detail">
                   <div className="detail-header">
                     <div>
-                      <h3>{selectedMail.subject}</h3>
-                      <p>Postfach: {imapConfig.mailbox}</p>
+                      <h3>{selectedMail?.subject ?? "Keine Mail ausgewählt"}</h3>
+                      <p>Postfach: {mailboxName}</p>
                     </div>
                     <p className="muted">Absender wird nicht veröffentlicht</p>
                   </div>
                   <div className="detail-body">
                     <p className="detail-label">Inhalt (anonymisiert)</p>
-                    <p className="detail-text">{selectedMail.body}</p>
+                    <p className="detail-text">{selectedMail?.body ?? ""}</p>
                   </div>
                   <div className="attachments">
                     <p className="detail-label">Geplante Anhänge</p>
-                    {selectedMail.attachments.length === 0 ? (
-                      <p className="muted">Keine Anhänge verfügbar.</p>
-                    ) : (
+                    {selectedMail?.attachments?.length ? (
                       <div className="attachment-grid">
                         {selectedMail.attachments.map((file) => (
                           <label key={file} className="attachment">
@@ -273,28 +344,12 @@ export default function App() {
                           </label>
                         ))}
                       </div>
+                    ) : (
+                      <p className="muted">Keine Anhänge verfügbar.</p>
                     )}
                   </div>
                 </div>
               </div>
-            </article>
-
-            <article className="card">
-              <h2>Thread-Vorschau</h2>
-              <p className="muted">Max. {MAX_POST} Zeichen pro Post. Nummerierung wird ergänzt.</p>
-              <div className="thread-preview">
-                {threadParts.map((part, index) => (
-                  <div key={part} className="thread-part">
-                    <div className="thread-meta">
-                      Post {index + 1}/{threadParts.length}
-                    </div>
-                    <p>{part}</p>
-                  </div>
-                ))}
-              </div>
-              <button className="primary" type="button">
-                Veröffentlichung starten
-              </button>
             </article>
           </section>
         ) : null}
@@ -303,88 +358,42 @@ export default function App() {
           <section className="grid">
             <article className="card">
               <h2>IMAP-Setup</h2>
-              <div className="form">
-                <label>
-                  Server
-                  <input
-                    value={imapConfig.server}
-                    onChange={(event) =>
-                      setImapConfig((prev) => ({ ...prev, server: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  Port
-                  <input
-                    value={imapConfig.port}
-                    onChange={(event) =>
-                      setImapConfig((prev) => ({ ...prev, port: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  Postfach
-                  <input
-                    value={imapConfig.mailbox}
-                    onChange={(event) =>
-                      setImapConfig((prev) => ({ ...prev, mailbox: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  Benutzername
-                  <input
-                    value={imapConfig.username}
-                    onChange={(event) =>
-                      setImapConfig((prev) => ({ ...prev, username: event.target.value }))
-                    }
-                  />
-                </label>
-                <label className="toggle">
-                  TLS aktiv
-                  <input
-                    type="checkbox"
-                    checked={imapConfig.tls}
-                    onChange={(event) =>
-                      setImapConfig((prev) => ({ ...prev, tls: event.target.checked }))
-                    }
-                  />
-                  <span className="switch" />
-                </label>
+              <p className="muted">Zugangsdaten werden serverseitig verwaltet.</p>
+              <div className="info-list">
+                <div>
+                  <p className="role-title">Status</p>
+                  <p className="muted">
+                    {health.imapConfigured ? "Konfiguriert" : "Fehlende Angaben"}
+                  </p>
+                </div>
+                <div>
+                  <p className="role-title">Postfach</p>
+                  <p className="muted">{mailboxName}</p>
+                </div>
               </div>
+              <button className="secondary" type="button" onClick={syncInbox}>
+                IMAP-Verbindung prüfen
+              </button>
             </article>
 
             <article className="card">
               <h2>BlueSky-API</h2>
-              <div className="form">
-                <label>
-                  Handle
-                  <input
-                    value={blueSkyConfig.handle}
-                    onChange={(event) =>
-                      setBlueSkyConfig((prev) => ({ ...prev, handle: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  App-Passwort
-                  <input
-                    value={blueSkyConfig.appPassword}
-                    onChange={(event) =>
-                      setBlueSkyConfig((prev) => ({ ...prev, appPassword: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  API-Host
-                  <input
-                    value={blueSkyConfig.host}
-                    onChange={(event) =>
-                      setBlueSkyConfig((prev) => ({ ...prev, host: event.target.value }))
-                    }
-                  />
-                </label>
+              <p className="muted">Zugangsdaten werden serverseitig verwaltet.</p>
+              <div className="info-list">
+                <div>
+                  <p className="role-title">Status</p>
+                  <p className="muted">
+                    {health.blueSkyConfigured ? "Konfiguriert" : "Fehlende Angaben"}
+                  </p>
+                </div>
+                <div>
+                  <p className="role-title">Verbindungstest</p>
+                  <p className="muted">{blueSkyCheck}</p>
+                </div>
               </div>
+              <button className="secondary" type="button" onClick={checkBlueSky}>
+                BlueSky-Verbindung prüfen
+              </button>
             </article>
 
             <article className="card">
@@ -404,9 +413,23 @@ export default function App() {
                   <p className="muted">Status prüfen, aber keine Änderungen</p>
                 </div>
               </div>
-              <button className="secondary" type="button">
-                Neuen User anlegen
-              </button>
+            </article>
+
+            <article className="card">
+              <h2>Admin-Login</h2>
+              <p className="muted">Admin-Login wird serverseitig gesetzt.</p>
+              <div className="info-list">
+                <div>
+                  <p className="role-title">Status</p>
+                  <p className="muted">
+                    {health.adminConfigured ? "Hinterlegt" : "Fehlt"}
+                  </p>
+                </div>
+                <div>
+                  <p className="role-title">Hinweis</p>
+                  <p className="muted">ADMIN_EMAIL und ADMIN_PASSWORD in der .env setzen.</p>
+                </div>
+              </div>
             </article>
           </section>
         ) : null}
@@ -417,21 +440,28 @@ export default function App() {
           <div className="modal">
             <div className="modal-header">
               <div>
-                <h2>Vorschau</h2>
-                <p>Prüfe die Inhalte vor der Veröffentlichung.</p>
+                <h2>Publikations-Vorschau</h2>
+                <p>Prüfe den Thread, bevor du veröffentlichst.</p>
               </div>
               <button className="ghost" type="button" onClick={() => setShowPreview(false)}>
                 Schließen
               </button>
             </div>
             <div className="modal-content">
-              <h3>{selectedMail.subject}</h3>
-              <p>{selectedMail.body}</p>
+              <h3>{selectedMail?.subject}</h3>
+              <div className="thread-preview">
+                {threadParts.map((part, index) => (
+                  <div key={`${part}-${index}`} className="thread-part">
+                    <div className="thread-meta">
+                      Post {index + 1}/{threadParts.length}
+                    </div>
+                    <p>{part}</p>
+                  </div>
+                ))}
+              </div>
               <div className="modal-attachments">
                 <p className="detail-label">Geplante Anhänge</p>
-                {selectedMail.attachments.length === 0 ? (
-                  <p className="muted">Keine Anhänge ausgewählt.</p>
-                ) : (
+                {selectedMail?.attachments?.length ? (
                   <ul>
                     {selectedMail.attachments
                       .filter((file) => selectedAttachments[file])
@@ -439,14 +469,17 @@ export default function App() {
                         <li key={file}>{file}</li>
                       ))}
                   </ul>
+                ) : (
+                  <p className="muted">Keine Anhänge ausgewählt.</p>
                 )}
               </div>
+              {publishStatus ? <p className="status-text">{publishStatus}</p> : null}
             </div>
             <div className="modal-footer">
               <button className="secondary" type="button" onClick={() => setShowPreview(false)}>
                 Weiter bearbeiten
               </button>
-              <button className="primary" type="button">
+              <button className="primary" type="button" onClick={publishThread}>
                 Veröffentlichung starten
               </button>
             </div>

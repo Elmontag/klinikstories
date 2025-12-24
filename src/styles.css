@@ -172,6 +172,11 @@ input {
   gap: 16px;
 }
 
+.button-row {
+  display: flex;
+  gap: 10px;
+}
+
 .primary,
 .secondary,
 .ghost {
@@ -307,6 +312,14 @@ input {
   margin: 0;
 }
 
+.error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
 .checklist {
   display: grid;
   gap: 12px;
@@ -406,6 +419,17 @@ input {
 .role-list {
   display: grid;
   gap: 12px;
+}
+
+.info-list {
+  display: grid;
+  gap: 12px;
+}
+
+.status-text {
+  color: #1d4ed8;
+  font-weight: 600;
+  margin: 0;
 }
 
 .role-title {
