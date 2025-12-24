@@ -35,8 +35,7 @@ const initialInbox = [
 
 const navItems = [
   { id: "dashboard", label: "Übersicht" },
-  { id: "inbox", label: "Inbox" },
-  { id: "publikation", label: "Publikation" },
+  { id: "workflow", label: "Inbox & Publikation" },
   { id: "settings", label: "Einstellungen" }
 ];
 
@@ -98,8 +97,7 @@ export default function App() {
 
   const navDescription = {
     dashboard: "Status, Integrationen und Inbox-Überblick.",
-    inbox: "Eingänge prüfen und Inhalte vorbereiten.",
-    publikation: "Thread-Building und Veröffentlichung starten.",
+    workflow: "Eingänge prüfen, Thread aufteilen und veröffentlichen.",
     settings: "IMAP, BlueSky und Rollen verwalten."
   };
 
@@ -198,7 +196,7 @@ export default function App() {
 
             <article className="card">
               <h2>Nächste Schritte</h2>
-              <p className="muted">Öffne die Inbox für Details oder starte die Publikation.</p>
+              <p className="muted">Wechsle in den Workflow, um Inhalte zu prüfen und zu publizieren.</p>
               <div className="role-list">
                 <div>
                   <p className="role-title">Inbox prüfen</p>
@@ -209,25 +207,24 @@ export default function App() {
                   <p className="muted">Thread-Länge prüfen und Veröffentlichung starten.</p>
                 </div>
               </div>
-              <button className="secondary" type="button" onClick={() => setActiveNav("publikation")}
+              <button className="secondary" type="button" onClick={() => setActiveNav("workflow")}
               >
-                Zur Publikation wechseln
+                Zum Workflow
               </button>
             </article>
           </section>
         ) : null}
 
-        {activeNav === "inbox" ? (
+        {activeNav === "workflow" ? (
           <section className="grid">
             <article className="card wide">
               <div className="card-header">
                 <div>
-                  <h2>Inbox-Details</h2>
-                  <p>Inhalt prüfen und Anhänge auswählen.</p>
+                  <h2>Inbox & Publikation</h2>
+                  <p>Inhalte prüfen, Anhänge auswählen und Thread vorbereiten.</p>
                 </div>
-                <button className="secondary" type="button" onClick={() => setActiveNav("publikation")}
-                >
-                  Zur Publikation
+                <button className="secondary" type="button" onClick={() => setShowPreview(true)}>
+                  Vorschau öffnen
                 </button>
               </div>
               <div className="inbox">
@@ -260,7 +257,7 @@ export default function App() {
                     <p className="detail-text">{selectedMail.body}</p>
                   </div>
                   <div className="attachments">
-                    <p className="detail-label">Anhänge</p>
+                    <p className="detail-label">Geplante Anhänge</p>
                     {selectedMail.attachments.length === 0 ? (
                       <p className="muted">Keine Anhänge verfügbar.</p>
                     ) : (
@@ -279,45 +276,6 @@ export default function App() {
                     )}
                   </div>
                 </div>
-              </div>
-            </article>
-          </section>
-        ) : null}
-
-        {activeNav === "publikation" ? (
-          <section className="grid">
-            <article className="card wide">
-              <div className="card-header">
-                <div>
-                  <h2>Publikationsvorbereitung</h2>
-                  <p>Thread aufteilen und Veröffentlichung auslösen.</p>
-                </div>
-                <button className="secondary" type="button" onClick={() => setShowPreview(true)}>
-                  Vorschau öffnen
-                </button>
-              </div>
-              <div className="detail-body">
-                <p className="detail-label">Ausgewählte Mail</p>
-                <p className="detail-text">{selectedMail.body}</p>
-              </div>
-              <div className="attachments">
-                <p className="detail-label">Geplante Anhänge</p>
-                {selectedMail.attachments.length === 0 ? (
-                  <p className="muted">Keine Anhänge verfügbar.</p>
-                ) : (
-                  <div className="attachment-grid">
-                    {selectedMail.attachments.map((file) => (
-                      <label key={file} className="attachment">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(selectedAttachments[file])}
-                          onChange={() => toggleAttachment(file)}
-                        />
-                        <span>{file}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
               </div>
             </article>
 
