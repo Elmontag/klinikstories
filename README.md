@@ -31,6 +31,30 @@ Ein modernes, schlankes und responsives Dashboard in React/Vite zur Steuerung de
 - Rollen & Rechte: Admin-only User-Erstellung.
 - Responsive UI: Modernes, schlankes Dashboard für Desktop & Mobile.
 
+## Konfiguration
+Die UI liest Konfigurationswerte aus Environment-Variablen (Vite-Präfix `VITE_`). Lege dazu eine `.env` auf Basis von `.env.example` an. Keine Secrets im Repository ablegen.
+
+Benötigte Variablen:
+- `VITE_IMAP_SERVER`
+- `VITE_IMAP_PORT`
+- `VITE_IMAP_MAILBOX`
+- `VITE_IMAP_TLS`
+- `VITE_IMAP_USERNAME`
+- `VITE_BLUESKY_HANDLE`
+- `VITE_BLUESKY_APP_PASSWORD`
+- `VITE_BLUESKY_HOST`
+
+## Deployment (Docker Compose)
+Das Dashboard wird als statische Vite-App gebaut und über `vite preview` bereitgestellt.
+
+```bash
+cp .env.example .env
+
+docker compose up --build
+```
+
+Die Compose-Definition nutzt ein Volume für persistente Daten (`dashboard-data`). Dieses Volume ist vorgesehen, um zukünftige Status- oder Sync-Daten dauerhaft zu speichern.
+
 ## Sicherheit & Datenschutz
 - Credentials werden verschlüsselt gespeichert.
 - Anonymisierung: Absendernamen/Emails werden nicht in Posts übernommen.

@@ -1,0 +1,19 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "4173:4173"
+    environment:
+      - VITE_IMAP_SERVER=${VITE_IMAP_SERVER}
+      - VITE_IMAP_PORT=${VITE_IMAP_PORT}
+      - VITE_IMAP_MAILBOX=${VITE_IMAP_MAILBOX}
+      - VITE_IMAP_TLS=${VITE_IMAP_TLS}
+      - VITE_IMAP_USERNAME=${VITE_IMAP_USERNAME}
+      - VITE_BLUESKY_HANDLE=${VITE_BLUESKY_HANDLE}
+      - VITE_BLUESKY_APP_PASSWORD=${VITE_BLUESKY_APP_PASSWORD}
+      - VITE_BLUESKY_HOST=${VITE_BLUESKY_HOST}
+    volumes:
+      - dashboard-data:/app/data
+
+volumes:
+  dashboard-data:
