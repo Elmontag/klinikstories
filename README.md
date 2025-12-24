@@ -33,20 +33,12 @@ Ein modernes, schlankes und responsives Dashboard in React/Vite zur Steuerung de
 
 ## Sicherheit & Datenschutz
 - Credentials werden verschlüsselt gespeichert.
-- Config außerhalb des Webroots (z. B. `/var/klinikstories/config`).
 - Anonymisierung: Absendernamen/Emails werden nicht in Posts übernommen.
 - Least-Privilege: Minimale Rechte für Service-Accounts.
 
 ## Deployment
 Deployment über Docker Compose.
-
 - Webroot enthält keine Secrets/Config.
-
-## Konfigurations-Templates & Einrichtung
-Die Templates liegen im Repo unter `config-templates/`. Sie dienen als Vorlage und enthalten keine Secrets.
-
-1. Kopiere die Templates außerhalb des Webroots (z. B. `/var/klinikstories/config`).
-2. Ergänze echte Zugangsdaten und Secrets.
 
 ## Nicht-Ziele (Explizit)
 - Keine Speicherung persönlicher Absenderdaten in Posts.
