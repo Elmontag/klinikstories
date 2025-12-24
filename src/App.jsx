@@ -48,6 +48,7 @@ export default function App() {
     blueSkyConfigured: false,
     adminConfigured: false
   });
+  const [imapPing, setImapPing] = useState("Ungeprüft");
   const [blueSkyCheck, setBlueSkyCheck] = useState("Ungeprüft");
   const [publishStatus, setPublishStatus] = useState("");
 
@@ -108,6 +109,21 @@ export default function App() {
     } catch (error) {
       setSyncError(error.message);
       setInbox(demoInbox);
+    }
+  };
+
+  const pingImap = async () => {
+    setImapPing("Prüfe...");
+    try {
+      const response = await fetch(`${apiBase}/api/imap/ping`);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error ?? "IMAP-Ping fehlgeschlagen");
+      }
+      const data = await response.json();
+      setImapPing(data.ok ? "Erreichbar" : `Fehler: ${data.error ?? "Unbekannt"}`);
+    } catch (error) {
+      setImapPing(`Fehler: ${error.message}`);
     }
   };
 
@@ -370,10 +386,19 @@ export default function App() {
                   <p className="role-title">Postfach</p>
                   <p className="muted">{mailboxName}</p>
                 </div>
+                <div>
+                  <p className="role-title">Server-Erreichbarkeit</p>
+                  <p className="muted">{imapPing}</p>
+                </div>
               </div>
-              <button className="secondary" type="button" onClick={syncInbox}>
-                IMAP-Verbindung prüfen
-              </button>
+              <div className="button-row">
+                <button className="secondary" type="button" onClick={pingImap}>
+                  IMAP-Server prüfen
+                </button>
+                <button className="secondary" type="button" onClick={syncInbox}>
+                  IMAP-Sync testen
+                </button>
+              </div>
             </article>
 
             <article className="card">

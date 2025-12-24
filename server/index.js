@@ -4,6 +4,7 @@ import cors from "cors";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { BskyAgent } from "@atproto/api";
+import tls from "tls";
 
 const app = express();
 app.use(cors());
@@ -40,13 +41,58 @@ const isBlueSkyConfigured = () =>
 const isAdminConfigured = () =>
   Boolean(config.admin.email && config.admin.password);
 
+const pingImap = () =>
+  new Promise((resolve) => {
+    const socket = tls.connect(
+      {
+        host: config.imap.host,
+        port: config.imap.port,
+        servername: config.imap.host,
+        timeout: 5000
+      },
+      () => {
+        socket.end();
+        resolve({ ok: true });
+      }
+    );
+
+    socket.on("error", (error) => {
+      resolve({ ok: false, error: error.message });
+    });
+
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve({ ok: false, error: "Timeout" });
+    });
+  });
+
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     imapConfigured: isImapConfigured(),
     blueSkyConfigured: isBlueSkyConfigured(),
-    adminConfigured: isAdminConfigured()
+    adminConfigured: isAdminConfigured(),
+    imap: {
+      host: config.imap.host ?? "",
+      port: config.imap.port ?? 0,
+      mailbox: config.imap.mailbox ?? "",
+      tls: config.imap.secure ?? true,
+      userConfigured: Boolean(config.imap.auth.user)
+    },
+    bluesky: {
+      host: config.bluesky.service,
+      handleConfigured: Boolean(config.bluesky.handle)
+    }
   });
+});
+
+app.get("/api/imap/ping", async (_req, res) => {
+  if (!config.imap.host) {
+    res.status(400).json({ ok: false, error: "IMAP_HOST fehlt." });
+    return;
+  }
+  const result = await pingImap();
+  res.json(result);
 });
 
 app.get("/api/imap/messages", async (_req, res) => {
