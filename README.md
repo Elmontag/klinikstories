@@ -23,13 +23,27 @@ Ein modernes, schlankes und responsives Dashboard in React/Vite zur Steuerung de
 8. **Sicherheit:** Schutz von Login- und API-Daten.
 9. **Rollen:** Nur Admins dürfen neue User anlegen.
 
-## Funktionsumfang (geplant)
-- IMAP-Integration: Abruf von Mails aus einem konfigurierten Postfach.
-- BlueSky-Integration: Post/Thread-Publishing inkl. optionaler Bildanhänge.
-- Status-Tracking: Speicherung des Publikationsstatus als Mail-Tag/Label.
-- Preview-Workflow: Lightbox-Preview vor Veröffentlichung.
-- Rollen & Rechte: Admin-only User-Erstellung.
-- Responsive UI: Modernes, schlankes Dashboard für Desktop & Mobile.
+## Konfiguration
+Die UI liest den API-Endpunkt aus `VITE_API_BASE`. Backend-Zugänge werden ausschließlich serverseitig über Environment-Variablen gesetzt. Lege dazu eine `.env` auf Basis von `.env.example` an. Keine Secrets im Repository ablegen.
+
+Benötigte Variablen:
+- Frontend: `VITE_API_BASE`
+- IMAP: `IMAP_HOST`, `IMAP_PORT`, `IMAP_MAILBOX`, `IMAP_TLS`, `IMAP_USER`, `IMAP_PASS`
+- BlueSky: `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`, `BLUESKY_HOST`
+- Admin: `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+
+Hinweis: Für den Ordnernamen verwende in der Regel `INBOX` (Großbuchstaben).
+
+## Deployment (Docker Compose)
+Das Dashboard wird als statische Vite-App gebaut und über `vite preview` bereitgestellt. Die API läuft als eigener Service.
+
+```bash
+cp .env.example .env
+
+docker compose up --build
+```
+
+Die Compose-Definition nutzt ein Volume für persistente Daten (`dashboard-data`). Dieses Volume ist für zukünftige Status- oder Sync-Daten vorgesehen.
 
 ## Sicherheit & Datenschutz
 - Credentials werden verschlüsselt gespeichert.
